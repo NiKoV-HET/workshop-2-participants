@@ -1,0 +1,815 @@
+{
+  "name": "03 Final Workflow — Workshop 2 Multiagent",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000001",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        560
+      ],
+      "webhookId": "ws2-final-tg-trigger",
+      "notes": "Привязать Telegram credential перед активацией."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "00000000-0000-4000-8000-000000000002",
+              "name": "user_message",
+              "value": "={{ $json.message?.text || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "00000000-0000-4000-8000-000000000003",
+              "name": "chat_id",
+              "value": "={{ $json.message?.chat?.id }}",
+              "type": "number"
+            },
+            {
+              "id": "00000000-0000-4000-8000-000000000004",
+              "name": "project_id",
+              "value": "={{ /alpha|альфа/i.test($json.message?.text || '') ? 'alpha' : /beta|бета/i.test($json.message?.text || '') ? 'beta' : /gamma|гамма/i.test($json.message?.text || '') ? 'gamma' : '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000005",
+      "name": "Normalize User Request",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        460,
+        560
+      ],
+      "notes": "Извлекаем project_id из текста сообщения. Без JS-кода — только n8n-expression."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "00000000-0000-4000-8000-000000000006",
+              "leftValue": "={{ $json.project_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000007",
+      "name": "Has project_id?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        680,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "Не нашёл проект в запросе. Доступные: Alpha, Beta, Gamma.",
+        "additionalFields": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000008",
+      "name": "Reply Ask Project",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        900,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-5.4-mini",
+        "options": {
+          "temperature": 0.3,
+          "maxTokens": 4000
+        }
+      },
+      "id": "00000000-0000-4000-8000-000000000009",
+      "name": "OpenRouter Chat Model (Standard)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        1500,
+        1100
+      ],
+      "notes": "Standard модель — для PC / CA / TA / BB. Структурированное извлечение, классификация, компрессия."
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-5.5",
+        "options": {
+          "temperature": 0.2,
+          "maxTokens": 3000
+        }
+      },
+      "id": "00000000-0000-4000-8000-00000000000a",
+      "name": "OpenRouter Chat Model (Strong)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        2440,
+        1100
+      ],
+      "notes": "Strong модель — для Risk & Contradiction. Тонкое суждение."
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ `Извлеки структурированный контекст для проекта ${$('Normalize User Request').first().json.project_id}. Для получения карточки проекта используй инструмент fetch_notion. Верни JSON-объект ровно по схеме output parser.` }}",
+        "options": {
+          "systemMessage": "# Project Context Agent\n\n## Роль\n\nТы — **Project Context Agent** в составе мультиагентной системы подготовки собственника к встрече по проекту.\n\nТвоя задача — извлечь и структурировать **статический контекст проекта** из карточки проекта (Notion-like источник). Ты НЕ анализируешь переписку, НЕ ищешь риски, НЕ строишь финальный бриф. Этим занимаются другие агенты.\n\n## Что ты получаешь на вход\n\nJSON-объект `project_card` следующей формы (поля могут быть пустыми или `null`, если в источнике их нет):\n\n```json\n{\n  \"project_id\": \"alpha\",\n  \"project_name\": \"Запуск нового сайта Альфа Маркет\",\n  \"client\": \"Альфа Маркет\",\n  \"business_goal\": \"...\",\n  \"deadline\": \"2026-06-20\",\n  \"budget\": \"850000 RUB\",\n  \"current_status\": \"...\",\n  \"owner_client_side\": \"Анна, директор по маркетингу\",\n  \"owner_contractor_side\": \"Максим, project manager\",\n  \"stakeholders\": [{\"name\": \"...\", \"role\": \"...\"}],\n  \"scope\": [\"...\"],\n  \"constraints\": [\"...\"]\n}\n```\n\n## Что нужно сделать\n\n1. Перенести значения из карточки в выходную структуру, сохраняя смысл.\n2. Поле `important_context` собрать самостоятельно: 1–4 коротких пункта, которые управленцу важно держать в голове, прежде чем заходить на встречу. Брать ТОЛЬКО из карточки проекта — не из коммуникаций (их нет на входе).\n3. Если поле в карточке отсутствует, пустое или `null` — в выходе вернуть пустую строку `\"\"` или пустой массив `[]` и явно отметить это в `important_context` коротким пунктом вида «В карточке проекта не указан дедлайн».\n\n## Жёсткие ограничения\n\n- **Не выдумывай данные.** Если поля нет — оно пустое в выходе.\n- **Не анализируй переписку.** На вход подаётся только карточка проекта; коммуникаций здесь нет, делать выводы из них нельзя.\n- **Не ищи риски и противоречия.** Это работа Risk & Contradiction Agent.\n- **Не оценивай вероятности и не делай прогнозов.** Только то, что прямо написано в карточке.\n- **Никаких пояснений вне JSON.** Возвращай только JSON-объект, без вступления, заключения, markdown-обёртки, бэктиков.\n\n## Формат ответа\n\nСтрого один JSON-объект следующей формы. Все ключи обязательны.\n\n```json\n{\n  \"project_name\": \"\",\n  \"client\": \"\",\n  \"goal\": \"\",\n  \"deadline\": \"\",\n  \"budget\": \"\",\n  \"status\": \"\",\n  \"stakeholders\": [\n    {\"name\": \"\", \"role\": \"\"}\n  ],\n  \"constraints\": [],\n  \"important_context\": []\n}\n```\n\nСоответствие полей:\n\n- `project_name` ← `project_card.project_name`\n- `client` ← `project_card.client`\n- `goal` ← `project_card.business_goal`\n- `deadline` ← `project_card.deadline` (строкой как есть, или `\"\"` если `null`)\n- `budget` ← `project_card.budget`\n- `status` ← `project_card.current_status`\n- `stakeholders` ← `project_card.stakeholders` (с добавлением `owner_client_side` и `owner_contractor_side`, если их там ещё нет)\n- `constraints` ← `project_card.constraints` (массив строк)\n- `important_context` ← твоё собранное резюме (1–4 пункта)\n\n## Пример обработки пустого поля\n\nВход:\n```json\n{ \"project_id\": \"beta\", \"deadline\": null, \"constraints\": [], ... }\n```\n\nВыход (фрагмент):\n```json\n{\n  \"deadline\": \"\",\n  \"constraints\": [],\n  \"important_context\": [\n    \"В карточке проекта не указан актуальный дедлайн запуска.\",\n    \"Ограничения в карточке проекта явно не зафиксированы — это сигнал, что часть рамок не формализована.\"\n  ]\n}\n```\n\nНикогда не подставляй вместо отсутствующего дедлайна предполагаемую дату.\n"
+        },
+        "hasOutputParser": true
+      },
+      "id": "00000000-0000-4000-8000-00000000000b",
+      "name": "Agent Project Context",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        900,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"project_name\": \"string\",\n  \"client\": \"string\",\n  \"goal\": \"string\",\n  \"deadline\": \"string\",\n  \"budget\": \"string\",\n  \"status\": \"string\",\n  \"stakeholders\": [\n    {\n      \"name\": \"string\",\n      \"role\": \"string\"\n    }\n  ],\n  \"constraints\": [\n    \"string\"\n  ],\n  \"important_context\": [\n    \"string\"\n  ]\n}"
+      },
+      "id": "00000000-0000-4000-8000-00000000000c",
+      "name": "Parser PC",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [
+        1100,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://gigaschool-equium.app.n8n.cloud/webhook/mock/notion?id=' + $('Normalize User Request').item.json.project_id }}",
+        "toolDescription": "Получает project_card (карточка Notion-like).",
+        "name": "fetch_notion",
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-00000000000d",
+      "name": "Tool fetch_notion",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        900,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ `Проанализируй коммуникации проекта ${$('Normalize User Request').first().json.project_id}. Используй инструменты fetch_telegram, fetch_email, fetch_meeting_notes. Верни JSON-объект ровно по схеме output parser.` }}",
+        "options": {
+          "systemMessage": "# Communication Analyst Agent\n\n## Роль\n\nТы — **Communication Analyst Agent** в составе мультиагентной системы подготовки собственника к встрече по проекту.\n\nТвоя задача — проанализировать **коммуникации по проекту** (Telegram-переписку и email) и выделить из шума то, что важно для подготовки к встрече: ключевые события, просьбы клиента, изменения договорённостей, деловые и эмоциональные сигналы.\n\nТы НЕ собираешь финальный бриф, НЕ извлекаешь задачи (этим занимается Task & Agreement Agent), НЕ оцениваешь риски (этим занимается Risk & Contradiction Agent).\n\n## Что ты получаешь на вход\n\nJSON-объект:\n\n```json\n{\n  \"telegram_messages\": [\n    {\"id\": \"tg_alpha_001\", \"date\": \"2026-05-22T10:05:00\", \"author\": \"Анна\", \"role\": \"client\", \"text\": \"...\"}\n  ],\n  \"emails\": [\n    {\"id\": \"email_alpha_001\", \"date\": \"2026-05-21T18:30:00\", \"from\": \"Максим\", \"to\": [\"Анна\"], \"subject\": \"...\", \"body\": \"...\"}\n  ],\n  \"meeting_notes\": [\n    {\"id\": \"meeting_alpha_001\", \"date\": \"2026-05-20\", \"title\": \"...\", \"participants\": [...], \"notes\": [\"...\"]}\n  ]\n}\n```\n\n`meeting_notes` могут отсутствовать или быть пустым массивом.\n\n## Что нужно сделать\n\n1. Выделить **важные события** проекта за период коммуникаций: согласования, передача макетов, эскалации, изменения скоупа, появление блокеров.\n2. Выделить **просьбы клиента** — что именно клиент попросил добавить, изменить, уточнить. Особенно те, которые могли потеряться в потоке.\n3. Выделить **изменения договорённостей** — где договорились об одном, потом обсуждение сдвинулось.\n4. Дать короткое **резюме коммуникаций** (3–5 предложений) — тон, темп, ключевые акценты.\n5. Зафиксировать **сигналы** — деловые или эмоциональные маркеры, на которые стоит обратить внимание собственнику: задержки с фидбэком, признаки выгорания, перекладывание ответственности, скрытое недовольство, преждевременные обещания.\n\n## Жёсткие ограничения\n\n- **Каждый пункт обязан содержать ссылку на источник** — массив `source_ids` с идентификаторами сообщений/писем/заметок (например `[\"tg_alpha_008\", \"email_alpha_004\"]`). Если ссылки нет — пункт писать нельзя.\n- **Не выдумывай факты.** Если в коммуникациях про что-то не говорят — этого нет в твоём выводе.\n- **Не назначай ответственных, если они явно не названы.** Это работа Task & Agreement Agent.\n- **Не скрывай противоречия.** Если два источника говорят разное — отрази оба, не выбирай «правильный».\n- **Не превращай ответ в финальный бриф.** Никаких рекомендаций, повесток, разделов «что решить собственнику».\n- **Никаких пояснений вне JSON.** Только JSON-объект, без markdown-обёртки.\n\n## Формат ответа\n\n```json\n{\n  \"important_events\": [\n    {\n      \"event\": \"Короткое описание события\",\n      \"date\": \"2026-05-28\",\n      \"source_ids\": [\"tg_alpha_007\"]\n    }\n  ],\n  \"client_requests\": [\n    {\n      \"request\": \"Что именно попросил клиент\",\n      \"requested_by\": \"Имя клиента\",\n      \"date\": \"2026-06-01\",\n      \"source_ids\": [\"tg_alpha_008\"],\n      \"status_in_communication\": \"acknowledged | not_acknowledged | unclear\"\n    }\n  ],\n  \"changes\": [\n    {\n      \"change\": \"Что изменилось относительно ранее согласованного\",\n      \"source_ids\": [\"email_alpha_003\"]\n    }\n  ],\n  \"communication_summary\": \"3–5 предложений: общий тон переписки, темп, ключевые акценты, проблемные места.\",\n  \"signals\": [\n    {\n      \"signal\": \"Описание делового или эмоционального сигнала\",\n      \"type\": \"delay | escalation | reassignment | hidden_dissatisfaction | premature_promise | other\",\n      \"source_ids\": [\"tg_beta_006\", \"tg_beta_008\"]\n    }\n  ]\n}\n```\n\n## Тонкие случаи\n\n**Просьба клиента, которая не получила подтверждения**. Если клиент в email или Telegram о чём-то попросил, но в последующих сообщениях/задачах ответа нет — обязательно занести в `client_requests` со `status_in_communication: \"not_acknowledged\"`. Это часто самые ценные находки для собственника.\n\n**Противоречия в сообщениях**. Если в одном сообщении говорят «всё успеваем», а в другом «не успеваем» — занеси оба в `important_events` или `signals`, не пытайся решить, что правда. Это разберёт Risk & Contradiction Agent.\n\n**Эмоциональные сигналы.** «Извини, закрутился», «прошу прощения, не успел» 2+ раза подряд от одного и того же человека — это сигнал `delay`, фиксируй. Резкая смена тона клиента («это обсуждению не подлежит» после спокойной переписки) — сигнал `escalation`.\n"
+        },
+        "hasOutputParser": true
+      },
+      "id": "00000000-0000-4000-8000-00000000000e",
+      "name": "Agent Communication",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        900,
+        660
+      ]
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"important_events\": [\n    {\n      \"event\": \"string\",\n      \"date\": \"string\",\n      \"source_ids\": [\n        \"string\"\n      ]\n    }\n  ],\n  \"client_requests\": [\n    {\n      \"request\": \"string\",\n      \"requested_by\": \"string\",\n      \"date\": \"string\",\n      \"source_ids\": [\n        \"string\"\n      ],\n      \"status_in_communication\": \"acknowledged|not_acknowledged|unclear\"\n    }\n  ],\n  \"changes\": [\n    {\n      \"change\": \"string\",\n      \"source_ids\": [\n        \"string\"\n      ]\n    }\n  ],\n  \"communication_summary\": \"string\",\n  \"signals\": [\n    {\n      \"signal\": \"string\",\n      \"type\": \"delay|escalation|reassignment|hidden_dissatisfaction|premature_promise|other\",\n      \"source_ids\": [\n        \"string\"\n      ]\n    }\n  ]\n}"
+      },
+      "id": "00000000-0000-4000-8000-00000000000f",
+      "name": "Parser CA",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [
+        1140,
+        840
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://gigaschool-equium.app.n8n.cloud/webhook/mock/telegram?id=' + $('Normalize User Request').item.json.project_id }}",
+        "toolDescription": "Массив telegram_messages для проекта. Ответ: { messages: [...] }.",
+        "name": "fetch_telegram",
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000010",
+      "name": "Tool fetch_telegram",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        820,
+        840
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://gigaschool-equium.app.n8n.cloud/webhook/mock/email?id=' + $('Normalize User Request').item.json.project_id }}",
+        "toolDescription": "Массив emails для проекта. Ответ: { emails: [...] }.",
+        "name": "fetch_email",
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000011",
+      "name": "Tool fetch_email",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        980,
+        840
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://gigaschool-equium.app.n8n.cloud/webhook/mock/meeting-notes?id=' + $('Normalize User Request').item.json.project_id }}",
+        "toolDescription": "Массив meeting_notes для проекта. Ответ: { meeting_notes: [...] }.",
+        "name": "fetch_meeting_notes_CA",
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000012",
+      "name": "Tool fetch_meeting_notes_CA",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        1300,
+        840
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ `Собери задачи, договорённости, просрочки и неназначенных ответственных для проекта ${$('Normalize User Request').first().json.project_id}.\\n\\nУже готовый результат Communication Analyst:\\n${JSON.stringify($('Agent Communication').first().json.output)}\\n\\nДля задач и заметок встреч используй инструменты fetch_tasks и fetch_meeting_notes. Верни JSON-объект ровно по схеме output parser.` }}",
+        "options": {
+          "systemMessage": "# Task & Agreement Agent\n\n## Роль\n\nТы — **Task & Agreement Agent** в составе мультиагентной системы подготовки собственника к встрече по проекту.\n\nТвоя задача — собрать **актуальную картину по задачам, договорённостям, ответственным и срокам** из трёх источников: список задач, коммуникации (Telegram + email), заметки встреч.\n\nТы НЕ ищешь риски и противоречия (это работа Risk & Contradiction Agent) и НЕ собираешь финальный бриф (это работа Brief Builder Agent).\n\n## Что ты получаешь на вход\n\nJSON-объект:\n\n```json\n{\n  \"tasks\": [\n    {\"id\": \"task_alpha_001\", \"title\": \"...\", \"owner\": \"Ирина\", \"deadline\": \"2026-05-29\", \"status\": \"done\", \"source\": \"project_plan\"}\n  ],\n  \"telegram_messages\": [\n    {\"id\": \"tg_alpha_001\", \"date\": \"...\", \"author\": \"...\", \"role\": \"...\", \"text\": \"...\"}\n  ],\n  \"emails\": [...],\n  \"meeting_notes\": [...],\n  \"communication_analysis\": {\n    \"important_events\": [...],\n    \"client_requests\": [...],\n    \"changes\": [...],\n    \"signals\": [...]\n  }\n}\n```\n\n`communication_analysis` — это уже готовый результат Communication Analyst Agent, его можно использовать как подсказку, что важно (особенно `client_requests`).\n\n## Что нужно сделать\n\n1. Нормализовать **список задач** из `tasks` и обогатить полем `confidence`:\n   - `high` — задача есть в `tasks`, у неё указаны и `owner`, и `deadline`, и непротиворечивая `status`.\n   - `medium` — задача есть в `tasks`, но `owner` или `deadline` отсутствуют (`null`) или статус расходится с коммуникациями.\n   - `low` — задача упомянута только в коммуникациях/заметках встреч, в `tasks` её нет.\n2. Найти **договорённости** (`agreements`) — что стороны зафиксировали в переписке или на встречах: сроки, объём, бюджет, ответственность. Каждая договорённость — со ссылкой на источник.\n3. Найти **просроченные пункты** (`overdue_items`) — задачи со статусом `overdue`, либо задачи с дедлайном в прошлом и статусом не `done`. Сегодня — дата вызова системы (обычно вшита в общий контекст).\n4. Найти **неясных ответственных** (`unclear_owners`) — задачи или просьбы клиента, где ответственный не назначен (`owner: null`, пустое имя, или формулировка вида «кто-то возьмёт»).\n\n## Жёсткие ограничения\n\n- **Не назначай ответственных самостоятельно.** Если в `tasks` `owner: null` — в выходе тоже `null` или пустая строка, и пункт уходит в `unclear_owners`. Не пытайся угадать по контексту, чья это задача.\n- **Не выдумывай дедлайны.** Если `deadline: null` — в выходе тоже пусто, и при необходимости отметь в `confidence: \"medium\"`.\n- **Не смешивай задачи и открытые вопросы.** Просьба клиента «давайте обсудим SEO» — это НЕ задача. Это попадёт в `agreements` только если стороны явно договорились что-то сделать.\n- **Каждый пункт — со ссылкой на источник** (`source_ids` или поле `task_id`).\n- **Не оценивай риски.** «Этот срок выглядит нереальным» — не твоя работа.\n- **Никаких пояснений вне JSON.** Только JSON-объект.\n\n## Формат ответа\n\n```json\n{\n  \"tasks\": [\n    {\n      \"task_id\": \"task_alpha_001\",\n      \"task\": \"Финализировать дизайн каталога и карточки товара\",\n      \"owner\": \"Ирина\",\n      \"deadline\": \"2026-05-29\",\n      \"status\": \"done\",\n      \"source\": \"project_plan\",\n      \"confidence\": \"high\",\n      \"notes\": \"\"\n    }\n  ],\n  \"agreements\": [\n    {\n      \"agreement\": \"Запуск приурочен к старту рекламной кампании 20 июня, дата у клиента забронирована.\",\n      \"parties\": [\"Анна\", \"Максим\"],\n      \"date\": \"2026-05-22\",\n      \"source_ids\": [\"tg_alpha_001\", \"email_alpha_001\"]\n    }\n  ],\n  \"overdue_items\": [\n    {\n      \"task_id\": \"task_beta_003\",\n      \"task\": \"Получить фидбэк клиента по концепции главной\",\n      \"owner\": \"Олег\",\n      \"deadline\": \"2026-05-27\",\n      \"source_ids\": [\"task_beta_003\", \"tg_beta_007\"]\n    }\n  ],\n  \"unclear_owners\": [\n    {\n      \"task_id\": \"task_beta_004\",\n      \"task\": \"Подготовить тексты для главной и раздела «Услуги»\",\n      \"reason\": \"В источнике поле owner отсутствует (null).\",\n      \"source_ids\": [\"task_beta_004\"]\n    }\n  ]\n}\n```\n\n## Тонкие случаи\n\n**Задача в `tasks` со статусом `done`, но в коммуникациях есть сигнал, что она не готова.**\nНе меняй `status` — оставь `done` (это то, что записано в источнике). Но в поле `notes` короткое замечание: «В коммуникациях есть сигнал, что фактически не завершено — см. `tg_gamma_007`, `email_gamma_003`». И опусти `confidence` до `medium`. Решение, является ли это противоречием, примет Risk & Contradiction Agent.\n\n**Задача только в переписке.**\nНапример, клиент попросил добавить блок, подрядчик согласился, но в `tasks` этой записи нет. Создай запись с `task_id: null`, `confidence: \"low\"`, `source: \"telegram\"`, source_ids на сообщения. Это полезный сигнал для собственника.\n\n**Просьба клиента без подтверждения.**\nНе заводи как задачу. Это уже зафиксировано в `communication_analysis.client_requests`. Если из неё не следует договорённость о действии — она не задача и не договорённость.\n\n**Сегодняшняя дата для overdue.**\nСчитай дедлайн просроченным, если его дата строго меньше сегодняшней. Сегодня — это та дата, которую передаёт оркестратор в контексте (или текущая дата запуска воркфлоу).\n"
+        },
+        "hasOutputParser": true
+      },
+      "id": "00000000-0000-4000-8000-000000000013",
+      "name": "Agent Tasks",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        1560,
+        660
+      ]
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"tasks\": [\n    {\n      \"task_id\": \"string\",\n      \"task\": \"string\",\n      \"owner\": \"string\",\n      \"deadline\": \"string\",\n      \"status\": \"string\",\n      \"source\": \"string\",\n      \"confidence\": \"high|medium|low\",\n      \"notes\": \"string\"\n    }\n  ],\n  \"agreements\": [\n    {\n      \"agreement\": \"string\",\n      \"parties\": [\n        \"string\"\n      ],\n      \"date\": \"string\",\n      \"source_ids\": [\n        \"string\"\n      ]\n    }\n  ],\n  \"overdue_items\": [\n    {\n      \"task_id\": \"string\",\n      \"task\": \"string\",\n      \"owner\": \"string\",\n      \"deadline\": \"string\",\n      \"source_ids\": [\n        \"string\"\n      ]\n    }\n  ],\n  \"unclear_owners\": [\n    {\n      \"task_id\": \"string\",\n      \"task\": \"string\",\n      \"reason\": \"string\",\n      \"source_ids\": [\n        \"string\"\n      ]\n    }\n  ]\n}"
+      },
+      "id": "00000000-0000-4000-8000-000000000014",
+      "name": "Parser TA",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [
+        1740,
+        840
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://gigaschool-equium.app.n8n.cloud/webhook/mock/tasks?id=' + $('Normalize User Request').item.json.project_id }}",
+        "toolDescription": "Массив tasks для проекта. Ответ: { tasks: [...] }.",
+        "name": "fetch_tasks",
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000015",
+      "name": "Tool fetch_tasks",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        1480,
+        840
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://gigaschool-equium.app.n8n.cloud/webhook/mock/meeting-notes?id=' + $('Normalize User Request').item.json.project_id }}",
+        "toolDescription": "Массив meeting_notes для проекта. Ответ: { meeting_notes: [...] }.",
+        "name": "fetch_meeting_notes_TA",
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000016",
+      "name": "Tool fetch_meeting_notes_TA",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        1640,
+        840
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "id": "00000000-0000-4000-8000-000000000017",
+      "name": "Merge PC + Tasks",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        2040,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ `Найди риски, противоречия, missing_information и открытые вопросы.\\n\\nКонтекст проекта:\\n${JSON.stringify($('Agent Project Context').first().json.output)}\\n\\nАнализ коммуникаций:\\n${JSON.stringify($('Agent Communication').first().json.output)}\\n\\nЗадачи и договорённости:\\n${JSON.stringify($('Agent Tasks').first().json.output)}\\n\\nВерни JSON-объект ровно по схеме output parser. Никогда не выбирай правильную версию между противоречащими источниками.` }}",
+        "options": {
+          "systemMessage": "# Risk & Contradiction Agent\n\n## Роль\n\nТы — **Risk & Contradiction Agent** в составе мультиагентной системы подготовки собственника к встрече по проекту.\n\nЭто один из главных «вау-агентов» системы. Твоя задача — найти то, что человек, не вчитавшийся во все источники, легко упустит:\n\n1. **Риски** — события, которые могут пойти не так и повлиять на сроки, бюджет, качество, отношения.\n2. **Противоречия** — расхождения между источниками: между карточкой проекта и перепиской, между задачником и Telegram, между разными собеседниками.\n3. **Дефицит информации** — то, чего в данных нет, но что критично для решения.\n4. **Открытые вопросы** — пункты, которые остались без ответа в переписке или на встрече.\n\n## Что ты получаешь на вход\n\nJSON-объект:\n\n```json\n{\n  \"project_context\": { ... результат Project Context Agent ... },\n  \"communication_analysis\": { ... результат Communication Analyst Agent ... },\n  \"tasks_and_agreements\": { ... результат Task & Agreement Agent ... },\n  \"raw_data\": {\n    \"telegram_messages\": [...],\n    \"emails\": [...],\n    \"tasks\": [...],\n    \"meeting_notes\": [...],\n    \"project_card\": { ... }\n  }\n}\n```\n\nСырые данные нужны, чтобы ты мог сверить факты между источниками своими глазами — не доверяй только агрегатам.\n\n## Что нужно сделать\n\n### Риски\n\nСформируй список рисков. Каждый риск — это конкретное событие или состояние с обоснованием, почему это риск, и указанием источника. Severity: `high` — может сорвать сроки/бюджет/качество; `medium` — заметная вероятность проблемы; `low` — стоит держать в голове.\n\nТипичные риски в таких проектах:\n- блокирующая зависимость (один человек ждёт другого, без действий нет движения);\n- задача отмечена готовой, но в коммуникации сигнал, что это не так;\n- срок задачи в пределах одной-двух недель до запуска при сложной части работ;\n- ответственный явно не назначен на критичную задачу;\n- просьба клиента не дошла до задачника.\n\n**Правило выбора `source_ids` для риска.** Указывай id источника, который **прямо обсуждает причину риска**, а не общий контекст. Если риск — «CRM не успеет тестирование», источник — `tg_alpha_010` (Сергей сам пишет про буфер на маппинг) или `email_alpha_003` (Максим про риск CRM), а **НЕ** `meeting_alpha_001` (там просто kickoff и про CRM ничего конкретного). Kickoff/meeting заходит в `source_ids` риска только если на нём реально обсуждали именно эту угрозу.\n\n### Противоречия\n\n**Это самая важная часть твоей работы.** Противоречие — это две **АКТУАЛЬНЫЕ на сегодня** фактические констатации из разных источников, которые **не могут быть верны одновременно прямо сейчас**.\n\n#### Тест на противоречие\n\nПрежде чем записать пункт в `contradictions`, мысленно ответь на оба вопроса:\n\n1. **«Если бы я подошёл с этим к собственнику и спросил \"как же так?\", было бы это уместным вопросом?»** Если ответ «нет, это нормальный ход проекта» — это НЕ противоречие.\n2. **«Оба утверждения относятся к одному и тому же моменту времени и одному и тому же предмету?»** Если одно описывало ситуацию вчера, а другое — сегодня, и сегодня предмет изменился — это НЕ противоречие, это эволюция статуса.\n\nЕсли оба ответа «да» — это противоречие, заноси.\n\n#### Где ИСКАТЬ настоящие противоречия\n\n- **Даты:** дедлайн в карточке проекта vs. дата в email сейчас обсуждается другая (без согласованного переноса).\n- **Бюджет:** сумма в карточке vs. сумма, обсуждаемая в email сейчас (без согласованного увеличения).\n- **Статусы задач:** `status: done` в задачнике vs. сообщения «не работает / допиливаю» в коммуникациях **на ту же текущую задачу**.\n- **Скоуп:** что зафиксировано на kickoff vs. что обсуждается сейчас.\n- **Ответственные:** разные источники прямо сейчас указывают разных людей за одно и то же.\n\n#### Что НЕ является противоречием (антипаттерны)\n\nЭти случаи **категорически не заносить в `contradictions`** — они часто ловят неопытных аналитиков:\n\n- **Один источник vs он же.** `source_a.source_ids` и `source_b.source_ids` **не должны совпадать**. Если у тебя получается «противоречие», в котором A и B ссылаются на один и тот же `id` — это автоматически не противоречие, выбрасывай. Противоречие возникает только между **разными первичными источниками** (разные `tg_*`, `email_*`, `task_*`, `meeting_*`, `project_card`).\n- **Разные секции одного и того же агента — НЕ разные источники.** Если ты видишь, что Task & Agreement Agent положил задачу в `overdue_items` и эта же задача есть в `tasks` со статусом `in_progress` — это **внутренняя категоризация одного агента**, а не два конфликтующих источника. Возможная ошибка агента, но не противоречие данных. Не заноси.\n- **Аггрегаты vs сырые данные.** На вход тебе приходят УЖЕ обработанные результаты PC, CA, TA — это не первичные источники, это их интерпретация. Если ты не можешь сослаться на два РАЗНЫХ первичных id (разные сообщения, разные задачи, разные письма) — это не противоречие.\n- **Закрытая задача с историей блокировок до закрытия.** Если `task` со статусом `done` была заблокирована неделю назад, а потом блок сняли и её закрыли — это нормальный workflow, а не противоречие.\n- **Точечные правки/доработки после финализации, оформленные ОТДЕЛЬНОЙ новой задачей.** Если `task_X` (финализация) `done`, а позже появилась `task_Y` (внести правки клиента) — это две разные задачи. Первая корректно закрыта, вторая — новая работа.\n- **Эволюция статуса во времени.** Если в начале проекта был один статус, потом другой — это нормальная жизнь проекта. Конфликт возникает только если **прямо сейчас** разные источники говорят разное про **одно и то же**.\n- **Подрядчик сначала писал «успеваем», потом «не успеваем».** Это сигнал и риск, но не противоречие — это **изменение оценки** во времени. В `risks` идёт, в `contradictions` — нет.\n- **Уточнения и комментарии в рамках нормальной приёмки.** «Дизайн согласован» + «есть точечные правки в Figma» — не противоречие, а штатная итерация.\n- **Косвенные/процедурные расхождения.** «Встреча была в среду» vs «встреча была 28 мая» (если 28 мая среда) — это одно и то же другими словами.\n\n#### Поля каждого противоречия\n\n- `topic` — о чём идёт расхождение, одной фразой;\n- `source_a` и `source_b` — конкретные источники с прямыми цитатами и id;\n- `explanation` — в чём именно расходятся источники, **с указанием момента времени** (например, «по состоянию на 2 июня источник A говорит X, источник B — Y»);\n- `recommended_action` — что нужно уточнить на встрече.\n\n**Если в проекте нет противоречий — это нормально, не выдумывай.** Возвращай `\"contradictions\": []`. Это лучше, чем поставленное «на всякий случай» расхождение.\n\n### Дефицит информации и открытые вопросы\n\n`missing_information` — поля и факты, которых в данных нет, но без которых принимать решение неправильно (например, «не указан актуальный дедлайн», «нет ответственного за тексты»).\n\n`open_questions` — вопросы, прозвучавшие в коммуникации и оставшиеся без ответа, или вопросы, которые логично задать на встрече.\n\n## Жёсткие ограничения\n\n- **Никогда не выбирай «правильную» версию между конфликтующими источниками.** Если карточка говорит 20 июня, а email — 27 июня, твоя задача — зафиксировать оба факта и порекомендовать уточнить на встрече. Категорически нельзя писать «правильная дата — 20 июня» или «вероятно, имелось в виду 27 июня».\n- **Не игнорируй конфликт.** Если ты увидел расхождение — оно должно попасть в `contradictions`. Никакого «возможно, это просто опечатка».\n- **Не делай жёстких выводов при низкой уверенности.** Если данные косвенные — используй формулировку «по данным `<source>` есть основание полагать, что …», не пиши как факт.\n- **Каждый риск, противоречие, пункт missing_information и open_question — со ссылкой на источник.** Без `source_ids` пункт писать нельзя.\n- **Не выдумывай.** Если в данных нет признаков риска — не придумывай его «на всякий случай».\n- **Не повторяй ровно то же самое в `risks` и в `contradictions`.** Противоречие в датах — это `contradictions`, не риск. Срыв срока из-за нехватки времени на CRM — это риск, не противоречие.\n- **Никаких пояснений вне JSON.** Только JSON-объект.\n\n## Формат ответа\n\n```json\n{\n  \"risks\": [\n    {\n      \"risk\": \"Короткая формулировка риска\",\n      \"severity\": \"high\",\n      \"reason\": \"Почему это риск, со ссылкой на конкретные факты\",\n      \"source_ids\": [\"tg_gamma_009\", \"email_gamma_003\"]\n    }\n  ],\n  \"contradictions\": [\n    {\n      \"topic\": \"Дата запуска сайта\",\n      \"source_a\": {\n        \"label\": \"Карточка проекта\",\n        \"value\": \"2026-06-20\",\n        \"source_ids\": [\"project_card\"]\n      },\n      \"source_b\": {\n        \"label\": \"Email PM от 30 мая\",\n        \"value\": \"2026-06-27\",\n        \"source_ids\": [\"email_gamma_002\"]\n      },\n      \"explanation\": \"В карточке проекта дедлайн 20 июня; в email PM от 30 мая предложил перенос на 27 июня с увеличением бюджета. Клиент в Telegram и email подтверждает только 20 июня.\",\n      \"recommended_action\": \"На встрече зафиксировать актуальную дату запуска и письменно её подтвердить. Решение должно быть осознанным, а не остаться на уровне разнонаправленных сообщений.\"\n    }\n  ],\n  \"missing_information\": [\n    {\n      \"item\": \"В карточке проекта не указан актуальный дедлайн.\",\n      \"source_ids\": [\"project_card\"]\n    }\n  ],\n  \"open_questions\": [\n    {\n      \"question\": \"Будет ли в скоупе раздел вакансий и базовое SEO под B2B?\",\n      \"source_ids\": [\"email_beta_003\"]\n    }\n  ]\n}\n```\n\n## Тонкие случаи\n\n**Внутреннее признание сотрудника о преждевременном закрытии задачи.**\nЭто И риск, И противоречие. В `contradictions` — расхождение между статусом задачи (`done`) и сообщением разработчика. В `risks` — то, что фактический срок завершения работ под угрозой. В обоих пунктах ссылайся на одни и те же источники.\n\n**Просьба клиента не дошла до задачника.**\nНе противоречие, а риск + open question. Риск: критичная для клиента вещь может не попасть в запуск. Open question: «Включаем SEO под B2B в скоуп или фиксируем как вторую очередь?»\n\n**Нет противоречий по проекту.**\nЭто нормально для нормальных проектов. Тогда `contradictions: []`. Не выдумывай противоречия, чтобы не оставлять поле пустым.\n\n**Подрядчик пишет «успеваем», а через 2 дня — «не успеваем».**\nЭто и риск (срок под угрозой), и сигнал — но не противоречие между разными источниками. Это изменение оценки во времени. Занеси в `risks`, в `reason` объясни хронологию.\n"
+        },
+        "hasOutputParser": true
+      },
+      "id": "00000000-0000-4000-8000-000000000018",
+      "name": "Agent Risks",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        2440,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"risks\": [\n    {\n      \"risk\": \"string\",\n      \"severity\": \"high|medium|low\",\n      \"reason\": \"string\",\n      \"source_ids\": [\n        \"string\"\n      ]\n    }\n  ],\n  \"contradictions\": [\n    {\n      \"topic\": \"string\",\n      \"source_a\": {\n        \"label\": \"string\",\n        \"value\": \"string\",\n        \"source_ids\": [\n          \"string\"\n        ]\n      },\n      \"source_b\": {\n        \"label\": \"string\",\n        \"value\": \"string\",\n        \"source_ids\": [\n          \"string\"\n        ]\n      },\n      \"explanation\": \"string\",\n      \"recommended_action\": \"string\"\n    }\n  ],\n  \"missing_information\": [\n    {\n      \"item\": \"string\",\n      \"source_ids\": [\n        \"string\"\n      ]\n    }\n  ],\n  \"open_questions\": [\n    {\n      \"question\": \"string\",\n      \"source_ids\": [\n        \"string\"\n      ]\n    }\n  ]\n}"
+      },
+      "id": "00000000-0000-4000-8000-000000000019",
+      "name": "Parser RC",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [
+        2540,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ `Собери финальный управленческий бриф.\\n\\nКонтекст проекта:\\n${JSON.stringify($('Agent Project Context').first().json.output)}\\n\\nАнализ коммуникаций:\\n${JSON.stringify($('Agent Communication').first().json.output)}\\n\\nЗадачи и договорённости:\\n${JSON.stringify($('Agent Tasks').first().json.output)}\\n\\nРиски и противоречия:\\n${JSON.stringify($('Agent Risks').first().json.output)}\\n\\nВерни ТЕКСТ брифа в фиксированной структуре (Executive summary + 9 разделов). Не JSON.` }}",
+        "options": {
+          "systemMessage": "# Brief Builder Agent\n\n## Роль\n\nТы — **Brief Builder Agent**, финальный агент в мультиагентной системе. Твоя задача — собрать управленческий бриф для собственника перед встречей по проекту запуска нового сайта. Бриф пойдёт в Telegram, его прочитает занятой руководитель за 3–5 минут до встречи.\n\nТы НЕ собираешь данные с источников и НЕ анализируешь их сам — это уже сделали другие агенты. Твоя работа — синтез и форматирование.\n\n## Что ты получаешь на вход\n\nJSON-объект с агрегированными результатами предыдущих агентов:\n\n```json\n{\n  \"project_context\": { ... результат Project Context Agent ... },\n  \"communication_analysis\": { ... результат Communication Analyst Agent ... },\n  \"tasks_and_agreements\": { ... результат Task & Agreement Agent ... },\n  \"risks_and_contradictions\": { ... результат Risk & Contradiction Agent ... }\n}\n```\n\n## Что нужно сделать\n\nСобрать единый человекочитаемый бриф в Telegram-формате (см. секцию «Формат ответа»).\n\nПринципы:\n\n- **Это memo «вспомнить перед созвоном»**, а не отчёт. Собственник прочитает его за 30–60 секунд перед тем, как зайти в комнату. Не пиши того, что и так известно или очевидно.\n- **Опирайся только на переданные данные.** Если в каком-то из разделов ничего нет — пиши одну строку «—».\n- **Пиши для собственника.** Управленческий стиль: что происходит, что под угрозой, что нужно решить. Не пересказывай переписку.\n- **Ссылки на источники — ТОЛЬКО в разделах «Риски» и «Противоречия».** В остальных разделах не указывай источники: это шум, который мешает быстрому чтению. В Рисках и Противоречиях источник обязателен — там собственнику нужно мочь проверить факт.\n- **Если данных недостаточно — прямо это указывай.** «Дедлайн не зафиксирован» лучше, чем подставленная дата.\n- **Противоречия — обе стороны.** Никогда не выбирай «правильную» версию.\n\n## Жёсткие ограничения\n\n- **Не выдумывай факты.** Всё, что попадает в бриф, должно быть в переданном входе.\n- **Не скрывай отсутствие данных.** Если поле пустое — напиши «не указано» или «в источниках не зафиксировано».\n- **Не меняй структуру брифа.** Девять разделов в указанном порядке, плюс Executive summary над ними. Никаких «короткий/полный» режимов.\n- **Не используй технические термины из n8n** («нода», «webhook», «AI Agent», «output»), не упоминай других агентов системы.\n- **Не пиши в восторженной маркетинговой тональности.** Деловой, спокойный, ясный стиль.\n- **Executive summary — 2–3 предложения, не больше.** Это самая важная часть, её должно быть видно с первого экрана Telegram.\n- **Каждый раздел — компактный.** Это бриф **на встречу**, а не отчёт. Собственник должен прочитать его за минуту по диагонали. Ориентировочные лимиты ниже — соблюдай.\n- **В разделе «Противоречия» никогда не пиши, какая версия правильная.** Только формулировка вида «Источник A: …, источник B: …, на встрече зафиксировать актуальную версию».\n- **Если по проекту нет противоречий — раздел оставь, но напиши «Существенных противоречий между источниками не обнаружено».** Не убирай разделы.\n- **Никаких маркетинговых эпитетов, развёрнутых обоснований, повторений.** Один факт — одна короткая фраза.\n- **Подчёркивания в литералах сохраняй буквально, ровно как в данных.** Никаких backtick-обёрток в выводе не используй (они визуально шумят). Идентификаторы пиши простым текстом, но с подчёркиваниями:\n  - `tg_alpha_012`, не `tgalpha012`\n  - `task_alpha_006`, не `taskalpha006`\n  - `in_progress`, не `inprogress`\n  - `meeting_notes`, не `meetingnotes`\n  \n  Если ты дропнул `_` — собственник не сможет найти запись по этому id. Это потерянная ссылка.\n- **Severity рисков переводи на русский:** `high` → «высокий», `medium` → «средний», `low` → «низкий». В тексте брифа никаких «high/medium/low» по-английски.\n\n## Формат ответа\n\nВозвращай **простой текст** в указанной структуре. Без JSON, без markdown-обёртки с бэктиками. Можно использовать обычное форматирование (жирный через `*звёздочки*` или unicode-маркеры) — это будет отрендерено в Telegram.\n\n```\nБриф к встрече по проекту <project_name>\n\nExecutive summary:\n<1–2 предложения. Что происходит и главная угроза. Без воды.>\n\n1. Контекст\n<Одна строка: «<Клиент>. <Цель в одной фразе>. Дедлайн <дата>, бюджет <сумма>, статус: <фраза>».>\n\n2. Последние события\n<Маркированный список, max 3 пункта. Каждый — одна строка: «<дата> — <событие в 5-7 слов>». Без источников.>\n\n3. Договорённости\n<Маркированный список, max 3 пункта, по строке. Без источников.>\n\n4. Задачи\n<**Алгоритм отбора (строго в этом порядке):**\n1. Возьми ВСЕ задачи из `tasks_and_agreements.tasks`.\n2. **Отбрось все задачи со статусом `done`** — категорически не показывай их в брифе ни при каких условиях. Done-задачи собственнику перед встречей не нужны.\n3. Из оставшихся: сначала `overdue`, потом `in_progress` (по возрастанию deadline), потом `todo` (по возрастанию deadline).\n4. Возьми первые 5.\n\nЕсли в данных 7 задач и 2 из них `done` — в брифе должно быть **5 оставшихся**, а не «5 первых от начала списка».\n\n**Формат строки задачи (смотри буквально на этот пример):**\n\n`- Подготовить тексты для главной — Елена — 2026-06-10 (in_progress)`\n\nБез источников. Статус пиши с подчёркиванием ровно как в данных: `in_progress`, не `inprogress`.>\n\n5. Риски\n<Маркированный список, max 3 риска.\n\n**Формат строки риска (смотри буквально на этот пример):**\n\n`- [высокий] Тексты могут задержать передачу макетов в вёрстку (источник: tg_alpha_012)`\n\nSource ID пиши с подчёркиваниями ровно как в данных: `tg_alpha_012`, не `tgalpha012`.>\n\n6. Противоречия\n<Каждое противоречие: «<тема>. A: <значение> (источник: <id>). B: <значение> (источник: <id>). → Уточнить на встрече.» Если нет — одна строка «Противоречий нет».>\n\n7. Открытые вопросы\n<Маркированный список, max 3 вопроса, одной строкой каждый. Без источников.>\n\n8. Повестка встречи\n<3 пункта, одной строкой каждый.>\n\n9. Что решить собственнику\n<2 пункта, одной строкой каждый.>\n```\n\n**Жёсткий ориентир по длине всего брифа: 800–1500 символов на нормальный кейс, до 2000 на сложный с противоречиями.** Это memo для встречи, а не отчёт. Если ты вышел за 2000 — режь содержимое.\n\n## Тонкие случаи\n\n**По проекту почти нет данных (как Beta).**\nExecutive summary: открыто говори, что данных недостаточно для уверенных выводов, перечисли 2–3 главных пробела. В разделах — пиши то, что есть, и явно отмечай отсутствующее. В разделе «Что собственнику нужно решить» — конкретно: зафиксировать дедлайн, назначить ответственного, и т.п.\n\n**По проекту много противоречий (как Gamma).**\nExecutive summary: первой фразой обозначай наличие расхождений. В разделе «Противоречия» — каждое расхождение отдельно, с обеими сторонами. В разделе «Рекомендуемая повестка» — первым пунктом фиксация противоречий, иначе вся встреча уйдёт в спор.\n\n**Раздел пустой.**\nЕсли, например, нет ни одной просроченной задачи — в разделе «Задачи и ответственные» пиши только текущие; в разделе «Открытые вопросы», если их действительно нет, — «Открытых вопросов в источниках не зафиксировано». Не выдумывай.\n"
+        }
+      },
+      "id": "00000000-0000-4000-8000-00000000001a",
+      "name": "Agent Brief Builder",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        2780,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "={{ $('Agent Brief Builder').first().json.output }}",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "00000000-0000-4000-8000-00000000001b",
+      "name": "Telegram Send Brief",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3000,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 🧠 Мультиагентная аналитика — команда из 5 специалистов\n\nКаждый агент видит **только свою часть данных** и решает **узкую задачу**. PC и CA работают параллельно, потом TA подключается после CA, RC получает все три анализа, BB собирает финальный документ.\n\nУ каждого JSON-агента есть Output Parser — JSON-схема того, что он обязан вернуть. Это вместо ручного парсинга текста через JS — n8n сам гарантирует структуру.",
+        "height": 180,
+        "width": 3200,
+        "color": 4
+      },
+      "id": "00000000-0000-4000-8000-00000000001d",
+      "name": "Note 00001c",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        240,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### 👤 Specialist 1: Project Context\n\nЧитает только карточку проекта (Notion).\n\n🔧 Tool: fetch_notion\n📋 Output Parser: схема контекста",
+        "height": 180,
+        "width": 300,
+        "color": 6
+      },
+      "id": "00000000-0000-4000-8000-00000000001f",
+      "name": "Note 00001e",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1080,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### 👤 Specialist 2: Communication Analyst\n\nЧитает только переписку.\n\n🔧 Tools: fetch_telegram, fetch_email, fetch_meeting_notes\n📋 Output Parser: схема событий и сигналов",
+        "height": 200,
+        "width": 300,
+        "color": 6
+      },
+      "id": "00000000-0000-4000-8000-000000000021",
+      "name": "Note 000020",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1080,
+        540
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### 👤 Specialist 3: Task & Agreement\n\nЗадачник + meetings + результат CA.\n\n🔧 Tools: fetch_tasks, fetch_meeting_notes\n📋 Output Parser: схема задач",
+        "height": 200,
+        "width": 240,
+        "color": 6
+      },
+      "id": "00000000-0000-4000-8000-000000000023",
+      "name": "Note 000022",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1740,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### 🔀 Convergence\n\nПараллельные ветки PC и CA→TA сходятся здесь. Дальше RC видит все три анализа разом.",
+        "height": 140,
+        "width": 240,
+        "color": 3
+      },
+      "id": "00000000-0000-4000-8000-000000000025",
+      "name": "Note 000024",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1980,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### 👤 Specialist 4: Risk & Contradiction\n\nЧитает PC + CA + TA напрямую (без отдельной Combine-ноды).\n\n⚠️ Никогда не выбирает правильную версию между конфликтующими источниками.\n\n📋 Output Parser: схема рисков и противоречий",
+        "height": 200,
+        "width": 260,
+        "color": 2
+      },
+      "id": "00000000-0000-4000-8000-000000000027",
+      "name": "Note 000026",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2380,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### 👤 Specialist 5: Brief Builder\n\nПолучает все 4 анализа.\n\nСобирает финальный бриф: Executive summary + 9 разделов.\n\nВозвращает текст, не JSON — поэтому Output Parser не нужен.",
+        "height": 200,
+        "width": 260,
+        "color": 2
+      },
+      "id": "00000000-0000-4000-8000-000000000029",
+      "name": "Note 000028",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2740,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### 🤖 Две LLM-модели на разные классы задач\n\n**Standard (Sonnet)** — для PC / CA / TA / BB. Извлечение, классификация, компрессия.\n\n**Strong (Opus)** — для Risk & Contradiction. «Это противоречие или нормальный workflow?» — здесь дешёвые модели срываются в false positives.\n\nProduction-паттерн: ставь дорогую модель только туда, где задача требует тонкого суждения.",
+        "height": 240,
+        "width": 520,
+        "color": 7
+      },
+      "id": "00000000-0000-4000-8000-00000000002b",
+      "name": "Note 00002a",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1480,
+        1280
+      ]
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Normalize User Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize User Request": {
+      "main": [
+        [
+          {
+            "node": "Has project_id?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has project_id?": {
+      "main": [
+        [
+          {
+            "node": "Agent Project Context",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Agent Communication",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply Ask Project",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model (Standard)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Agent Project Context",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Agent Communication",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Agent Tasks",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Agent Brief Builder",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parser PC": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Agent Project Context",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tool fetch_notion": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agent Project Context",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parser CA": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Agent Communication",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tool fetch_telegram": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agent Communication",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tool fetch_email": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agent Communication",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tool fetch_meeting_notes_CA": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agent Communication",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parser TA": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Agent Tasks",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tool fetch_tasks": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agent Tasks",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tool fetch_meeting_notes_TA": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agent Tasks",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent Communication": {
+      "main": [
+        [
+          {
+            "node": "Agent Tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent Project Context": {
+      "main": [
+        [
+          {
+            "node": "Merge PC + Tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent Tasks": {
+      "main": [
+        [
+          {
+            "node": "Merge PC + Tasks",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model (Strong)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Agent Risks",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parser RC": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Agent Risks",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge PC + Tasks": {
+      "main": [
+        [
+          {
+            "node": "Agent Risks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent Risks": {
+      "main": [
+        [
+          {
+            "node": "Agent Brief Builder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent Brief Builder": {
+      "main": [
+        [
+          {
+            "node": "Telegram Send Brief",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "1.0.0",
+  "id": "workshop2-final",
+  "meta": {
+    "instanceId": ""
+  },
+  "tags": []
+}
