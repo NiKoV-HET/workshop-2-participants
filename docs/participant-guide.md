@@ -98,7 +98,7 @@
 
 1. После `IF (true)` добавляем ноду **AI Agent** (`@n8n/n8n-nodes-langchain.agent`).
 2. К ней подключаем ноду **OpenRouter Chat Model** через `ai_languageModel` connection. Привязываем OpenRouter credential, выбираем модель `gpt-5.4-mini`.
-3. В **System Message** (Options → System Message) вставляем готовый промпт из сниппета `Project Context Agent` (выдаёт ведущий, либо берёте из `prompts/project_context_agent.md`).
+3. В **System Message** (Options → System Message) вставляем готовый промпт `Project Context Agent` из `docs/snippets.md` (Блок 1).
 4. В **User Message** руками пишем простую строку:
    ```
    Извлеки контекст для проекта alpha.
@@ -155,7 +155,7 @@
 
 1. Добавляем ноду **Output Parser Structured** (`@n8n/n8n-nodes-langchain.outputParserStructured`).
 2. Подключаем её к Agent через `ai_outputParser` connection.
-3. В параметрах ноды в поле **JSON Schema Example** вставляем готовый JSON-сниппет (выдаёт ведущий, схема — в конце `prompts/project_context_agent.md`).
+3. В параметрах ноды в поле **JSON Schema Example** вставляем JSON-схему из `docs/snippets.md` (Блок 3).
 4. В Agent ноде ставим флажок **Output Parser** (`hasOutputParser: true`).
 5. В user message агента дописываем: «Верни JSON-объект ровно по схеме output parser.»
 6. Запускаем.
@@ -186,7 +186,7 @@
    - `fetch_telegram` → `…/mock/telegram?id={{ project_id }}`
    - `fetch_email` → `…/mock/email?id={{ project_id }}`
    - `fetch_meeting_notes` → `…/mock/meeting-notes?id={{ project_id }}`
-4. Подключаем **Output Parser Structured** с JSON-схемой из `prompts/communication_analyst_agent.md`.
+4. Подключаем **Output Parser Structured** с JSON-схемой из `docs/snippets.md` (Блок 4).
 5. System Message: копируем промпт Communication Analyst.
 6. User Message:
    ```

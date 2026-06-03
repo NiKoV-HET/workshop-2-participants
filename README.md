@@ -11,7 +11,7 @@
 - `docs/participant-guide.md` — пошаговая инструкция на интенсив. Главный файл.
 - `docs/snippets.md` — копипаста: промпты, схемы Output Parser, URL, выражения.
 - `docs/data-overview.md` — что лежит в трёх проектах датасета (Alpha / Beta / Gamma).
-- `prompts/` — System Message каждого из пяти агентов.
+- `prompts/` — резервные копии System Message каждого агента. Источник истины — `docs/snippets.md`, эта папка просто дублирует содержимое для удобства поиска по файлам.
 - `workflows/02_starter_workflow.json` — стартовый workflow, импортируется в n8n на старте.
 
 ## Как начать
