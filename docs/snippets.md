@@ -19,6 +19,18 @@ https://gigaschool-equium.app.n8n.cloud
 | Standard (для PC, CA, TA, BB) | `openai/gpt-5.4-mini` | `0.3` | `4000` |
 | Strong (для RC) | `openai/gpt-5.5` | `0.2` | `3000` |
 
+Имена моделей для копирования в поле **Model** ноды OpenRouter Chat Model:
+
+**Standard:**
+```
+openai/gpt-5.4-mini
+```
+
+**Strong:**
+```
+openai/gpt-5.5
+```
+
 **Telegram credential** — один и тот же на 3 ноды: `Telegram Trigger`, `Reply Ask Project`, `Telegram Send Brief`.
 
 ---
@@ -391,17 +403,58 @@ Tool fetch_meeting_notes_CA
 
 ### HTTP Tools — три штуки
 
-**Tool 1: `fetch_telegram`**
-- Description: `Массив telegram_messages для проекта. Ответ: { messages: [...] }.`
-- URL: `https://gigaschool-equium.app.n8n.cloud/webhook/mock/telegram?id={{ $('Normalize User Request').item.json.project_id }}`
+Method у всех трёх: `GET`.
 
-**Tool 2: `fetch_email`**
-- Description: `Массив emails для проекта. Ответ: { emails: [...] }.`
-- URL: `https://gigaschool-equium.app.n8n.cloud/webhook/mock/email?id={{ $('Normalize User Request').item.json.project_id }}`
+#### Tool 1 — fetch_telegram
 
-**Tool 3: `fetch_meeting_notes`**
-- Description: `Массив meeting_notes для проекта. Ответ: { meeting_notes: [...] }.`
-- URL: `https://gigaschool-equium.app.n8n.cloud/webhook/mock/meeting-notes?id={{ $('Normalize User Request').item.json.project_id }}`
+**Name** (внутреннее имя инструмента):
+```
+fetch_telegram
+```
+
+**Description:**
+```
+Массив telegram_messages для проекта. Ответ: { messages: [...] }.
+```
+
+**URL:**
+```
+https://gigaschool-equium.app.n8n.cloud/webhook/mock/telegram?id={{ $('Normalize User Request').item.json.project_id }}
+```
+
+#### Tool 2 — fetch_email
+
+**Name:**
+```
+fetch_email
+```
+
+**Description:**
+```
+Массив emails для проекта. Ответ: { emails: [...] }.
+```
+
+**URL:**
+```
+https://gigaschool-equium.app.n8n.cloud/webhook/mock/email?id={{ $('Normalize User Request').item.json.project_id }}
+```
+
+#### Tool 3 — fetch_meeting_notes
+
+**Name:**
+```
+fetch_meeting_notes
+```
+
+**Description:**
+```
+Массив meeting_notes для проекта. Ответ: { meeting_notes: [...] }.
+```
+
+**URL:**
+```
+https://gigaschool-equium.app.n8n.cloud/webhook/mock/meeting-notes?id={{ $('Normalize User Request').item.json.project_id }}
+```
 
 ### Output Parser JSON Schema
 
@@ -601,13 +654,41 @@ Telegram и email **тебе напрямую не видны** — их про�
 
 ### HTTP Tools — две штуки
 
-**Tool 1: `fetch_tasks`**
-- Description: `Массив tasks для проекта. Ответ: { tasks: [...] }.`
-- URL: `https://gigaschool-equium.app.n8n.cloud/webhook/mock/tasks?id={{ $('Normalize User Request').item.json.project_id }}`
+Method у обеих: `GET`.
 
-**Tool 2: `fetch_meeting_notes`**
-- Description: `Массив meeting_notes для проекта. Ответ: { meeting_notes: [...] }.`
-- URL: `https://gigaschool-equium.app.n8n.cloud/webhook/mock/meeting-notes?id={{ $('Normalize User Request').item.json.project_id }}`
+#### Tool 1 — fetch_tasks
+
+**Name:**
+```
+fetch_tasks
+```
+
+**Description:**
+```
+Массив tasks для проекта. Ответ: { tasks: [...] }.
+```
+
+**URL:**
+```
+https://gigaschool-equium.app.n8n.cloud/webhook/mock/tasks?id={{ $('Normalize User Request').item.json.project_id }}
+```
+
+#### Tool 2 — fetch_meeting_notes
+
+**Name:**
+```
+fetch_meeting_notes
+```
+
+**Description:**
+```
+Массив meeting_notes для проекта. Ответ: { meeting_notes: [...] }.
+```
+
+**URL:**
+```
+https://gigaschool-equium.app.n8n.cloud/webhook/mock/meeting-notes?id={{ $('Normalize User Request').item.json.project_id }}
+```
 
 ### Output Parser JSON Schema
 
@@ -691,10 +772,15 @@ Parser RC
 
 ### Отдельная Chat Model нода для RC
 
-Добавьте **вторую** ноду `OpenRouter Chat Model` (имя см. выше):
-- Model: `openai/gpt-5.5`
-- Temperature: `0.2`
-- MaxTokens: `3000`
+Добавьте **вторую** ноду `OpenRouter Chat Model` (имя см. в секции «Имена нод»). Параметры:
+
+**Model:**
+```
+openai/gpt-5.5
+```
+
+**Temperature:** `0.2`  
+**MaxTokens:** `3000`
 
 Подключите её к Agent Risks через `ai_languageModel`. **НЕ переподключайте остальных агентов** — они остаются на Standard.
 
