@@ -188,7 +188,10 @@
    - `fetch_meeting_notes` → `…/mock/meeting-notes?id={{ project_id }}`
 4. Подключаем **Output Parser Structured** с JSON-схемой из `prompts/communication_analyst_agent.md`.
 5. System Message: копируем промпт Communication Analyst.
-6. User Message: `={{ \`Проанализируй коммуникации проекта ${$('Normalize User Request').first().json.project_id}. Используй инструменты fetch_telegram, fetch_email, fetch_meeting_notes.\` }}`
+6. User Message:
+   ```
+   ={{ `Проанализируй коммуникации проекта ${$('Normalize User Request').first().json.project_id}. Используй инструменты fetch_telegram, fetch_email, fetch_meeting_notes.` }}
+   ```
 7. Подключаем `IF (true)` → Agent Communication (параллельно с Project Context).
 
 Прогон на Beta — открываем trace, **смотрим под Agent Communication** — видим **три HTTP-вызова подряд**. Агент сам объединил данные.
