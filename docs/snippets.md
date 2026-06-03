@@ -188,23 +188,15 @@ Agent Project Context
 
 ## Блок 2. HTTP Request Tool — fetch_notion
 
-### Имя ноды
+### Имя ноды и поле Name
 
-**HTTP Request Tool (имя ноды в workflow):**
-```
-Tool fetch_notion
-```
+Подключите HTTP Request Tool к Project Context Agent через `ai_tool`. И **имя ноды** (сверху, в workflow), и поле **Name** (внутри ноды, его видит LLM) — одно и то же:
 
-> Не путать с внутренним полем **Name** в самой ноде — оно ниже, это то, как агент зовёт инструмент.
-
-### Параметры ноды
-
-Подключите ноду к Project Context Agent через `ai_tool`.
-
-**Name** (внутреннее имя инструмента, его видит LLM):
 ```
 fetch_notion
 ```
+
+### Параметры ноды
 
 **Tool Description:**
 ```
@@ -260,6 +252,8 @@ Parser PC
 
 ⚠ **Имя AI-агента критично** — на него ссылаются Блоки 5–7 через `$('Agent Communication')`. Если назвать иначе (например, «Communication Analyst» по названию блока), эти ссылки сломаются.
 
+У каждого HTTP Request Tool — одно имя на ноду и на поле «Name» внутри (см. Блок 2).
+
 **AI Agent:**
 ```
 Agent Communication
@@ -272,20 +266,20 @@ Parser CA
 
 **HTTP Request Tool (telegram):**
 ```
-Tool fetch_telegram
+fetch_telegram
 ```
 
 **HTTP Request Tool (email):**
 ```
-Tool fetch_email
+fetch_email
 ```
 
 **HTTP Request Tool (meeting notes):**
 ```
-Tool fetch_meeting_notes_CA
+fetch_meeting_notes
 ```
 
-> Суффикс `_CA` нужен, чтобы отличить эту ноду от такой же в Блоке 5 (где будет `Tool fetch_meeting_notes_TA`). Имена нод в n8n должны быть уникальны. **Внутреннее** имя инструмента (поле «Name» внутри ноды) у обеих остаётся `fetch_meeting_notes` — агент зовёт инструмент по нему.
+> Эту ноду в Блоке 5 переиспользуем — там тоже нужны заметки встреч. n8n позволяет одной Tool-ноде иметь две `ai_tool` connection (одну к `Agent Communication`, вторую к `Agent Tasks`), новую создавать не надо.
 
 ### System Message
 
@@ -441,7 +435,7 @@ https://gigaschool-equium.app.n8n.cloud/webhook/mock/email?id={{ $('Normalize Us
 
 #### Tool 3 — fetch_meeting_notes
 
-**Name:**
+**Name** (и имя ноды, и поле Name — одинаковые):
 ```
 fetch_meeting_notes
 ```
@@ -455,6 +449,8 @@ fetch_meeting_notes
 ```
 https://gigaschool-equium.app.n8n.cloud/webhook/mock/meeting-notes?id={{ $('Normalize User Request').item.json.project_id }}
 ```
+
+> В Блоке 5 эта же нода переиспользуется — Agent Tasks тоже нужны заметки встреч, новую создавать не надо.
 
 ### Output Parser JSON Schema
 
@@ -494,6 +490,8 @@ https://gigaschool-equium.app.n8n.cloud/webhook/mock/meeting-notes?id={{ $('Norm
 
 ⚠ **Имя AI-агента критично** — на него ссылаются Блоки 6 и 7 через `$('Agent Tasks')`. Не «Task & Agreement».
 
+В этом блоке создаём один новый HTTP Request Tool — `fetch_tasks`. Для заметок встреч **переиспользуем** ноду `fetch_meeting_notes` из Блока 4: тянем от неё вторую `ai_tool` connection к `Agent Tasks`.
+
 **AI Agent:**
 ```
 Agent Tasks
@@ -504,17 +502,12 @@ Agent Tasks
 Parser TA
 ```
 
-**HTTP Request Tool (tasks):**
+**HTTP Request Tool (tasks, новый):**
 ```
-Tool fetch_tasks
-```
-
-**HTTP Request Tool (meeting notes):**
-```
-Tool fetch_meeting_notes_TA
+fetch_tasks
 ```
 
-> Суффикс `_TA` — чтобы отличаться от `Tool fetch_meeting_notes_CA` из Блока 4. Внутреннее имя инструмента — `fetch_meeting_notes` без суффикса.
+**HTTP Request Tool (meeting notes):** переиспользуется из Блока 4 — нода `fetch_meeting_notes`.
 
 ### System Message
 
@@ -675,20 +668,7 @@ https://gigaschool-equium.app.n8n.cloud/webhook/mock/tasks?id={{ $('Normalize Us
 
 #### Tool 2 — fetch_meeting_notes
 
-**Name:**
-```
-fetch_meeting_notes
-```
-
-**Description:**
-```
-Массив meeting_notes для проекта. Ответ: { meeting_notes: [...] }.
-```
-
-**URL:**
-```
-https://gigaschool-equium.app.n8n.cloud/webhook/mock/meeting-notes?id={{ $('Normalize User Request').item.json.project_id }}
-```
+**Не создаём заново.** Берём ноду `fetch_meeting_notes`, которую сделали в Блоке 4, и тянем от неё вторую `ai_tool` connection — теперь уже к `Agent Tasks`. Получается одна нода, две связи: с `Agent Communication` и с `Agent Tasks`. Описание, URL и Name у неё уже настроены — переиспользуются.
 
 ### Output Parser JSON Schema
 
