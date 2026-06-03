@@ -46,6 +46,17 @@ https://gigaschool-equium.app.n8n.cloud
 
 ## Блок 1. Project Context Agent — System Message
 
+### Имя ноды
+
+На эту ноду будут ссылаться Блоки 6 и 7 через `$('Agent Project Context')` — назовите её **ровно** так.
+
+**AI Agent:**
+```
+Agent Project Context
+```
+
+### System Message
+
 Вставьте в **Options → System Message** AI Agent ноды:
 
 <details>
@@ -165,9 +176,20 @@ https://gigaschool-equium.app.n8n.cloud
 
 ## Блок 2. HTTP Request Tool — fetch_notion
 
-В ноду `HTTP Request Tool` (`@n8n/n8n-nodes-langchain.toolHttpRequest`), подключённую к Project Context Agent через `ai_tool`:
+### Имя ноды
 
-**Name:**
+**HTTP Request Tool (имя ноды в workflow):**
+```
+Tool fetch_notion
+```
+
+> Не путать с внутренним полем **Name** в самой ноде — оно ниже, это то, как агент зовёт инструмент.
+
+### Параметры ноды
+
+Подключите ноду к Project Context Agent через `ai_tool`.
+
+**Name** (внутреннее имя инструмента, его видит LLM):
 ```
 fetch_notion
 ```
@@ -189,7 +211,16 @@ https://gigaschool-equium.app.n8n.cloud/webhook/mock/notion?id={{ $('Normalize U
 
 ## Блок 3. Output Parser Structured — для Project Context
 
-В ноде `Output Parser Structured`, в поле **JSON Schema Example**:
+### Имя ноды
+
+**Output Parser Structured:**
+```
+Parser PC
+```
+
+### JSON Schema Example
+
+В этой ноде в поле **JSON Schema Example**:
 
 ```json
 {
@@ -212,6 +243,37 @@ https://gigaschool-equium.app.n8n.cloud/webhook/mock/notion?id={{ $('Normalize U
 ---
 
 ## Блок 4. Communication Analyst — полный набор
+
+### Имена нод
+
+⚠ **Имя AI-агента критично** — на него ссылаются Блоки 5–7 через `$('Agent Communication')`. Если назвать иначе (например, «Communication Analyst» по названию блока), эти ссылки сломаются.
+
+**AI Agent:**
+```
+Agent Communication
+```
+
+**Output Parser Structured:**
+```
+Parser CA
+```
+
+**HTTP Request Tool (telegram):**
+```
+Tool fetch_telegram
+```
+
+**HTTP Request Tool (email):**
+```
+Tool fetch_email
+```
+
+**HTTP Request Tool (meeting notes):**
+```
+Tool fetch_meeting_notes_CA
+```
+
+> Суффикс `_CA` нужен, чтобы отличить эту ноду от такой же в Блоке 5 (где будет `Tool fetch_meeting_notes_TA`). Имена нод в n8n должны быть уникальны. **Внутреннее** имя инструмента (поле «Name» внутри ноды) у обеих остаётся `fetch_meeting_notes` — агент зовёт инструмент по нему.
 
 ### System Message
 
@@ -374,6 +436,32 @@ https://gigaschool-equium.app.n8n.cloud/webhook/mock/notion?id={{ $('Normalize U
 ---
 
 ## Блок 5. Task & Agreement — полный набор
+
+### Имена нод
+
+⚠ **Имя AI-агента критично** — на него ссылаются Блоки 6 и 7 через `$('Agent Tasks')`. Не «Task & Agreement».
+
+**AI Agent:**
+```
+Agent Tasks
+```
+
+**Output Parser Structured:**
+```
+Parser TA
+```
+
+**HTTP Request Tool (tasks):**
+```
+Tool fetch_tasks
+```
+
+**HTTP Request Tool (meeting notes):**
+```
+Tool fetch_meeting_notes_TA
+```
+
+> Суффикс `_TA` — чтобы отличаться от `Tool fetch_meeting_notes_CA` из Блока 4. Внутреннее имя инструмента — `fetch_meeting_notes` без суффикса.
 
 ### System Message
 
@@ -569,6 +657,30 @@ Telegram и email **тебе напрямую не видны** — их про�
 
 ## Блок 6. Risk & Contradiction — со Strong моделью
 
+### Имена нод
+
+⚠ **Имя AI-агента критично** — на него ссылается Блок 7 через `$('Agent Risks')`. Не «Risk & Contradiction».
+
+**Merge:**
+```
+Merge PC + Tasks
+```
+
+**OpenRouter Chat Model (вторая, для RC):**
+```
+OpenRouter Chat Model (Strong)
+```
+
+**AI Agent:**
+```
+Agent Risks
+```
+
+**Output Parser Structured:**
+```
+Parser RC
+```
+
 ### Merge нода (перед агентом)
 
 `n8n-nodes-base.merge`:
@@ -579,8 +691,7 @@ Telegram и email **тебе напрямую не видны** — их про�
 
 ### Отдельная Chat Model нода для RC
 
-Добавьте **вторую** ноду `OpenRouter Chat Model`:
-- Name (n8n): `OpenRouter Chat Model (Strong)`
+Добавьте **вторую** ноду `OpenRouter Chat Model` (имя см. выше):
 - Model: `openai/gpt-5.5`
 - Temperature: `0.2`
 - MaxTokens: `3000`
@@ -818,6 +929,18 @@ source_ids в твоих контрактах должны ссылаться н
 ---
 
 ## Блок 7. Brief Builder + финальный Telegram Send
+
+### Имена нод
+
+**AI Agent:**
+```
+Agent Brief Builder
+```
+
+**Telegram (Send Message):**
+```
+Telegram Send Brief
+```
 
 ### Brief Builder System Message
 
