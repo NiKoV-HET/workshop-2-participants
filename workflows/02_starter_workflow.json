@@ -1,0 +1,186 @@
+{
+  "name": "02 Starter Workflow — Workshop 2 Multiagent",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "id": "11111111-1111-4111-8111-111111111111",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        400
+      ],
+      "webhookId": "ws2-starter-telegram-trigger",
+      "notes": "Привяжите свой Telegram credential перед активацией workflow"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1111111-0001-4000-8000-000000000001",
+              "name": "user_message",
+              "value": "={{ $json.message?.text || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "a1111111-0001-4000-8000-000000000002",
+              "name": "chat_id",
+              "value": "={{ $json.message?.chat?.id }}",
+              "type": "number"
+            },
+            {
+              "id": "a1111111-0001-4000-8000-000000000003",
+              "name": "project_id",
+              "value": "={{ /alpha|альфа/i.test($json.message?.text || '') ? 'alpha' : /beta|бета/i.test($json.message?.text || '') ? 'beta' : /gamma|гамма/i.test($json.message?.text || '') ? 'gamma' : '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "22222222-2222-4222-8222-222222222222",
+      "name": "Normalize User Request",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        460,
+        400
+      ],
+      "notes": "Извлекаем project_id из текста сообщения через regex. Без Code-ноды."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "c3333333-0003-4000-8000-000000000001",
+              "leftValue": "={{ $json.project_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "33333333-3333-4333-8333-333333333333",
+      "name": "Has project_id?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        680,
+        400
+      ],
+      "notes": "Развилка: если project_id определился — true (правая ветка, куда вы будете строить); иначе false → Reply Ask Project."
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "Не нашёл проект в запросе. Доступные: Alpha, Beta, Gamma.",
+        "additionalFields": {}
+      },
+      "id": "44444444-4444-4444-8444-444444444444",
+      "name": "Reply Ask Project",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        900,
+        180
+      ],
+      "notes": "False-ветка IF — отправляем уточнение «Не нашёл проект». Использует тот же Telegram credential, что и Trigger."
+    },
+    {
+      "parameters": {
+        "content": "## 👋 Стартовый workflow интенсива\n\nВ этом стартере уже есть **точка входа** (Telegram Trigger), **извлечение `project_id`** (Set-нода Normalize), **развилка** (IF) и **ответ-уточнение** (Reply Ask Project).\n\nВаша работа начинается **в true-ветке IF** — туда вы по очереди добавите 5 AI-агентов по `docs/participant-guide.md`.\n\n**Checkpoint 0:** активируйте workflow, напишите боту любое сообщение без слов Alpha/Beta/Gamma — должно вернуться «Не нашёл проект в запросе...».",
+        "height": 220,
+        "width": 500,
+        "color": 4
+      },
+      "id": "55555555-5555-4555-8555-555555555555",
+      "name": "Welcome",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        240,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### ⬇️ Сюда добавляете первый AI Agent\n\nПо Блоку 1 `participant-guide.md`:\n1. Добавьте ноду AI Agent (`@n8n/n8n-nodes-langchain.agent`)\n2. Подключите OpenRouter Chat Model (`gpt-5.4-mini`)\n3. Скопируйте system prompt из `docs/snippets.md` (Блок 1)\n4. Напишите user message и временно подключите выход к Telegram Send Message для Checkpoint 1.",
+        "height": 220,
+        "width": 360,
+        "color": 6
+      },
+      "id": "66666666-6666-4666-8666-666666666666",
+      "name": "Hint True Branch",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        880,
+        420
+      ]
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Normalize User Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize User Request": {
+      "main": [
+        [
+          {
+            "node": "Has project_id?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has project_id?": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Reply Ask Project",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "2.0.0",
+  "id": "workshop2-starter",
+  "meta": {
+    "instanceId": ""
+  },
+  "tags": []
+}
