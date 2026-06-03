@@ -104,7 +104,7 @@
    Извлеки контекст для проекта alpha.
    ```
    Без выражений, без переменных. Просто литералом.
-5. Подключаем выход агента к новой `Telegram Send Brief` ноде (`Chat ID` → `={{ $('Telegram Trigger').item.json.message.chat.id }}`, `Text` → `={{ $json.output }}`).
+5. Подключаем выход агента к новой `Telegram Send Brief` ноде (`Chat ID` → `{{ $('Telegram Trigger').item.json.message.chat.id }}`, `Text` → `{{ $json.output }}`).
 6. Запускаем — пишем боту «Alpha».
 
 **Checkpoint 1.** Бот ответил **что-то про Альфа Маркет**. Это «что-то» будет неинтересное и неточное — модель просто наугад придумала контекст по слову «alpha». **И в этом весь смысл блока:** у агента есть роль (system prompt), но **нет данных**, поэтому он выдумывает. Дальше мы это исправим инструментом.
@@ -132,16 +132,16 @@
 
 **Делаем URL динамическим:**
 
-6. Переключаем URL в **Expression mode**.
-7. Вставляем целиком обёрнутое выражение:
+6. В URL заменяем хвост `?id=alpha` на выражение `?id={{ $('Normalize User Request').item.json.project_id }}`. Получится:
    ```
-   ={{ 'https://<n8n-host>/webhook/mock/notion?id=' + $('Normalize User Request').item.json.project_id }}
+   https://<n8n-host>/webhook/mock/notion?id={{ $('Normalize User Request').item.json.project_id }}
    ```
-8. В user message убираем литерал `alpha`, заменяем на:
+   Двойные фигурные скобки `{{ ... }}` — это n8n-интерполяция: всё внутри них вычисляется как JS, остальное остаётся литералом. Режим поля менять не нужно.
+7. В user message убираем литерал `alpha`, заменяем на:
    ```
-   ={{ `Извлеки контекст для проекта ${$('Normalize User Request').first().json.project_id}. Используй инструмент fetch_notion.` }}
+   Извлеки контекст для проекта {{ $('Normalize User Request').first().json.project_id }}. Используй инструмент fetch_notion.
    ```
-9. Прогоняем на Alpha и Beta — видим разные карточки.
+8. Прогоняем на Alpha и Beta — видим разные карточки.
 
 **Checkpoint 2.** На запрос «бриф по Alpha» бот возвращает структурированную информацию из карточки Alpha. На запрос по Beta — из карточки Beta, **с явным указанием, что дедлайн не зафиксирован**. Это первый раз, когда видна **специализация**: агент работает только с карточкой, дёргает её сам.
 
@@ -190,7 +190,7 @@
 5. System Message: копируем промпт Communication Analyst.
 6. User Message:
    ```
-   ={{ `Проанализируй коммуникации проекта ${$('Normalize User Request').first().json.project_id}. Используй инструменты fetch_telegram, fetch_email, fetch_meeting_notes.` }}
+   Проанализируй коммуникации проекта {{ $('Normalize User Request').first().json.project_id }}. Используй инструменты fetch_telegram, fetch_email, fetch_meeting_notes.
    ```
 7. Подключаем `IF (true)` → Agent Communication (параллельно с Project Context).
 
@@ -216,12 +216,12 @@
 3. System Message: промпт Task & Agreement.
 4. **User Message:**
    ```
-   ={{ `Собери задачи и договорённости для проекта ${$('Normalize User Request').first().json.project_id}.
+   Собери задачи и договорённости для проекта {{ $('Normalize User Request').first().json.project_id }}.
    
    Уже готовый результат Communication Analyst:
-   ${JSON.stringify($('Agent Communication').first().json.output)}
+   {{ JSON.stringify($('Agent Communication').first().json.output) }}
    
-   Используй инструменты fetch_tasks и fetch_meeting_notes.` }}
+   Используй инструменты fetch_tasks и fetch_meeting_notes.
    ```
 5. Прогоняем на Beta. В trace TA видны два HTTP-вызова + в самом user prompt уже подставлен JSON от CA.
 
@@ -251,15 +251,15 @@
 7. **HTTP-tools у RC нет** — он работает с уже собранными результатами.
 8. User Message:
    ```
-   ={{ `Найди риски, противоречия и открытые вопросы.
+   Найди риски, противоречия и открытые вопросы.
    
-   Контекст проекта: ${JSON.stringify($('Agent Project Context').first().json.output)}
+   Контекст проекта: {{ JSON.stringify($('Agent Project Context').first().json.output) }}
    
-   Анализ коммуникаций: ${JSON.stringify($('Agent Communication').first().json.output)}
+   Анализ коммуникаций: {{ JSON.stringify($('Agent Communication').first().json.output) }}
    
-   Задачи и договорённости: ${JSON.stringify($('Agent Tasks').first().json.output)}
+   Задачи и договорённости: {{ JSON.stringify($('Agent Tasks').first().json.output) }}
    
-   Верни строго JSON по схеме. Никогда не выбирай правильную версию между противоречащими источниками.` }}
+   Верни строго JSON по схеме. Никогда не выбирай правильную версию между противоречащими источниками.
    ```
 
 Прогон на Gamma. Открываем output Agent Risks:
@@ -285,21 +285,21 @@
 4. System Message: промпт Brief Builder.
 5. User Message:
    ```
-   ={{ `Собери финальный управленческий бриф.
+   Собери финальный управленческий бриф.
    
-   Контекст проекта: ${JSON.stringify($('Agent Project Context').first().json.output)}
+   Контекст проекта: {{ JSON.stringify($('Agent Project Context').first().json.output) }}
    
-   Анализ коммуникаций: ${JSON.stringify($('Agent Communication').first().json.output)}
+   Анализ коммуникаций: {{ JSON.stringify($('Agent Communication').first().json.output) }}
    
-   Задачи и договорённости: ${JSON.stringify($('Agent Tasks').first().json.output)}
+   Задачи и договорённости: {{ JSON.stringify($('Agent Tasks').first().json.output) }}
    
-   Риски и противоречия: ${JSON.stringify($('Agent Risks').first().json.output)}
+   Риски и противоречия: {{ JSON.stringify($('Agent Risks').first().json.output) }}
    
-   Верни ТЕКСТ брифа в фиксированной структуре. Не JSON.` }}
+   Верни ТЕКСТ брифа в фиксированной структуре. Не JSON.
    ```
 6. **Telegram Send Brief** в самом конце:
-   - **Chat ID:** `={{ $('Telegram Trigger').item.json.message.chat.id }}`
-   - **Text:** `={{ $('Agent Brief Builder').first().json.output }}`
+   - **Chat ID:** `{{ $('Telegram Trigger').item.json.message.chat.id }}`
+   - **Text:** `{{ $('Agent Brief Builder').first().json.output }}`
    - **Additional Fields → Parse Mode: `HTML`** ← **критично!** Без этого Telegram прочитает `_` в id вроде `tg_alpha_001` как markdown italics и при отображении удалит подчёркивания.
 
 **Checkpoint 7.** Прогоняем все три проекта подряд в Telegram:

@@ -29,17 +29,17 @@ https://gigaschool-equium.app.n8n.cloud
 
 **user_message** (string):
 ```
-={{ $json.message?.text || '' }}
+{{ $json.message?.text || '' }}
 ```
 
 **chat_id** (number):
 ```
-={{ $json.message?.chat?.id }}
+{{ $json.message?.chat?.id }}
 ```
 
 **project_id** (string):
 ```
-={{ /alpha|альфа/i.test($json.message?.text || '') ? 'alpha' : /beta|бета/i.test($json.message?.text || '') ? 'beta' : /gamma|гамма/i.test($json.message?.text || '') ? 'gamma' : '' }}
+{{ /alpha|альфа/i.test($json.message?.text || '') ? 'alpha' : /beta|бета/i.test($json.message?.text || '') ? 'beta' : /gamma|гамма/i.test($json.message?.text || '') ? 'gamma' : '' }}
 ```
 
 ---
@@ -101,7 +101,7 @@ JSON-объект `project_card` следующей формы (поля мог�
 **User Message** AI Agent ноды (вставьте в поле **Prompt → User Message**):
 
 ```
-={{ `Извлеки структурированный контекст для проекта ${$('Normalize User Request').first().json.project_id}. Для получения карточки проекта используй инструмент fetch_notion. Верни JSON-объект ровно по схеме output parser.` }}
+Извлеки структурированный контекст для проекта {{ $('Normalize User Request').first().json.project_id }}. Для получения карточки проекта используй инструмент fetch_notion. Верни JSON-объект ровно по схеме output parser.
 ```
 
 ---
@@ -122,10 +122,10 @@ fetch_notion
 
 **Method:** `GET`
 
-**URL** (поле в режиме Expression):
+**URL:**
 
 ```
-={{ 'https://gigaschool-equium.app.n8n.cloud/webhook/mock/notion?id=' + $('Normalize User Request').item.json.project_id }}
+https://gigaschool-equium.app.n8n.cloud/webhook/mock/notion?id={{ $('Normalize User Request').item.json.project_id }}
 ```
 
 ---
@@ -201,22 +201,22 @@ fetch_notion
 ### User Message
 
 ```
-={{ `Проанализируй коммуникации проекта ${$('Normalize User Request').first().json.project_id}. Используй инструменты fetch_telegram, fetch_email, fetch_meeting_notes. Верни JSON-объект ровно по схеме output parser.` }}
+Проанализируй коммуникации проекта {{ $('Normalize User Request').first().json.project_id }}. Используй инструменты fetch_telegram, fetch_email, fetch_meeting_notes. Верни JSON-объект ровно по схеме output parser.
 ```
 
 ### HTTP Tools — три штуки
 
 **Tool 1: `fetch_telegram`**
 - Description: `Массив telegram_messages для проекта. Ответ: { messages: [...] }.`
-- URL: `={{ 'https://gigaschool-equium.app.n8n.cloud/webhook/mock/telegram?id=' + $('Normalize User Request').item.json.project_id }}`
+- URL: `https://gigaschool-equium.app.n8n.cloud/webhook/mock/telegram?id={{ $('Normalize User Request').item.json.project_id }}`
 
 **Tool 2: `fetch_email`**
 - Description: `Массив emails для проекта. Ответ: { emails: [...] }.`
-- URL: `={{ 'https://gigaschool-equium.app.n8n.cloud/webhook/mock/email?id=' + $('Normalize User Request').item.json.project_id }}`
+- URL: `https://gigaschool-equium.app.n8n.cloud/webhook/mock/email?id={{ $('Normalize User Request').item.json.project_id }}`
 
 **Tool 3: `fetch_meeting_notes`**
 - Description: `Массив meeting_notes для проекта. Ответ: { meeting_notes: [...] }.`
-- URL: `={{ 'https://gigaschool-equium.app.n8n.cloud/webhook/mock/meeting-notes?id=' + $('Normalize User Request').item.json.project_id }}`
+- URL: `https://gigaschool-equium.app.n8n.cloud/webhook/mock/meeting-notes?id={{ $('Normalize User Request').item.json.project_id }}`
 
 ### Output Parser JSON Schema
 
@@ -297,23 +297,23 @@ fetch_notion
 ### User Message
 
 ```
-={{ `Собери задачи, договорённости, просрочки и неназначенных ответственных для проекта ${$('Normalize User Request').first().json.project_id}.
+Собери задачи, договорённости, просрочки и неназначенных ответственных для проекта {{ $('Normalize User Request').first().json.project_id }}.
 
 Уже готовый результат Communication Analyst:
-${JSON.stringify($('Agent Communication').first().json.output)}
+{{ JSON.stringify($('Agent Communication').first().json.output) }}
 
-Для задач и заметок встреч используй инструменты fetch_tasks и fetch_meeting_notes. Верни JSON-объект ровно по схеме output parser.` }}
+Для задач и заметок встреч используй инструменты fetch_tasks и fetch_meeting_notes. Верни JSON-объект ровно по схеме output parser.
 ```
 
 ### HTTP Tools — две штуки
 
 **Tool 1: `fetch_tasks`**
 - Description: `Массив tasks для проекта. Ответ: { tasks: [...] }.`
-- URL: `={{ 'https://gigaschool-equium.app.n8n.cloud/webhook/mock/tasks?id=' + $('Normalize User Request').item.json.project_id }}`
+- URL: `https://gigaschool-equium.app.n8n.cloud/webhook/mock/tasks?id={{ $('Normalize User Request').item.json.project_id }}`
 
 **Tool 2: `fetch_meeting_notes`**
 - Description: `Массив meeting_notes для проекта. Ответ: { meeting_notes: [...] }.`
-- URL: `={{ 'https://gigaschool-equium.app.n8n.cloud/webhook/mock/meeting-notes?id=' + $('Normalize User Request').item.json.project_id }}`
+- URL: `https://gigaschool-equium.app.n8n.cloud/webhook/mock/meeting-notes?id={{ $('Normalize User Request').item.json.project_id }}`
 
 ### Output Parser JSON Schema
 
@@ -433,18 +433,18 @@ source_ids для риска: указывай id источника, котор
 ### User Message
 
 ```
-={{ `Найди риски, противоречия, missing_information и открытые вопросы.
+Найди риски, противоречия, missing_information и открытые вопросы.
 
 Контекст проекта:
-${JSON.stringify($('Agent Project Context').first().json.output)}
+{{ JSON.stringify($('Agent Project Context').first().json.output) }}
 
 Анализ коммуникаций:
-${JSON.stringify($('Agent Communication').first().json.output)}
+{{ JSON.stringify($('Agent Communication').first().json.output) }}
 
 Задачи и договорённости:
-${JSON.stringify($('Agent Tasks').first().json.output)}
+{{ JSON.stringify($('Agent Tasks').first().json.output) }}
 
-Верни JSON-объект ровно по схеме output parser. Никогда не выбирай правильную версию между противоречащими источниками.` }}
+Верни JSON-объект ровно по схеме output parser. Никогда не выбирай правильную версию между противоречащими источниками.
 ```
 
 ### Output Parser JSON Schema
@@ -565,21 +565,21 @@ Executive summary:
 ### User Message
 
 ```
-={{ `Собери финальный управленческий бриф.
+Собери финальный управленческий бриф.
 
 Контекст проекта:
-${JSON.stringify($('Agent Project Context').first().json.output)}
+{{ JSON.stringify($('Agent Project Context').first().json.output) }}
 
 Анализ коммуникаций:
-${JSON.stringify($('Agent Communication').first().json.output)}
+{{ JSON.stringify($('Agent Communication').first().json.output) }}
 
 Задачи и договорённости:
-${JSON.stringify($('Agent Tasks').first().json.output)}
+{{ JSON.stringify($('Agent Tasks').first().json.output) }}
 
 Риски и противоречия:
-${JSON.stringify($('Agent Risks').first().json.output)}
+{{ JSON.stringify($('Agent Risks').first().json.output) }}
 
-Верни ТЕКСТ брифа в фиксированной структуре (Executive summary + 9 разделов). Не JSON.` }}
+Верни ТЕКСТ брифа в фиксированной структуре (Executive summary + 9 разделов). Не JSON.
 ```
 
 **У Brief Builder НЕТ Output Parser** — он возвращает текст, а не JSON.
@@ -590,12 +590,12 @@ ${JSON.stringify($('Agent Risks').first().json.output)}
 
 - **Chat ID:**
   ```
-  ={{ $('Telegram Trigger').item.json.message.chat.id }}
+  {{ $('Telegram Trigger').item.json.message.chat.id }}
   ```
 
 - **Text:**
   ```
-  ={{ $('Agent Brief Builder').first().json.output }}
+  {{ $('Agent Brief Builder').first().json.output }}
   ```
 
 - **Additional Fields → Parse Mode:** `HTML` ← **критично**, иначе подчёркивания в source IDs съест Telegram.
