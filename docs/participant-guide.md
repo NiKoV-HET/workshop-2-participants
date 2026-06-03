@@ -125,7 +125,7 @@
    - **Method:** GET
    - **URL** — сначала пишем захардкоженный для пробы:
      ```
-     https://<n8n-host>/webhook/mock/notion?id=alpha
+     https://gigaschool-equium.app.n8n.cloud/webhook/mock/notion?id=alpha
      ```
 4. В user message агента пишем: «Извлеки контекст для проекта alpha. Используй инструмент fetch_notion.»
 5. Запускаем. Смотрим **trace** в n8n executions — под Agent видна **сабнода HTTP вызова**. LLM сам решил дёрнуть инструмент.
@@ -134,7 +134,7 @@
 
 6. В URL заменяем хвост `?id=alpha` на выражение `?id={{ $('Normalize User Request').item.json.project_id }}`. Получится:
    ```
-   https://<n8n-host>/webhook/mock/notion?id={{ $('Normalize User Request').item.json.project_id }}
+   https://gigaschool-equium.app.n8n.cloud/webhook/mock/notion?id={{ $('Normalize User Request').item.json.project_id }}
    ```
    Двойные фигурные скобки `{{ ... }}` — это n8n-интерполяция: всё внутри них вычисляется как JS, остальное остаётся литералом. Режим поля менять не нужно.
 7. В user message убираем литерал `alpha`, заменяем на:
